@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Personal Financial Planning Dashboard</title>
+  <!-- Chart.js for the Cumulative Goal Progress graph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f8fafc; color: #1e293b; line-height: 1.6;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+    .header { text-align: center; margin-bottom: 3rem; }
+    .header h1 { font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem; }
+    .header p { color: #64748b; font-size: 1.1rem; }
+
+    .grid { display: grid; gap: 2rem; margin-bottom: 2rem; }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+
+    .card {
+      background: white; border-radius: 12px; padding: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1); border: 1px solid #e2e8f0;
+    }
+    .card-header { display: flex; align-items: center; margin-bottom: 1.5rem; gap: .5rem; }
+    .card-header h3 { font-size: 1.2rem; font-weight: 600; }
+
+    .icon { width: 20px; height: 20px; border-radius: 50%; }
+    .icon-blue { background-color: #3b82f6; }
+    .icon-green { background-color: #10b981; }
+    .icon-purple { background-color: #8b5cf6; }
+    .icon-orange { background-color: #f59e0b; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-weight: 500; margin-bottom: 0.5rem; color: #374151; }
+    .form-input {
+      width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+
+    .metrics-grid { display: grid; gap: 1rem; }
+    .metric { text-align: center; }
+    .metric-label { font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem; }
+    .metric-value { font-size: 1.5rem; font-weight: 700; }
+    .metric-value.success { color: #059669; }
+    .metric-value.primary { color: #3b82f6; }
+
+    .target-grid { display: grid; gap: 1rem; }
+    .target-card { padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
+    .target-card.funded { background: #f0fdf4; border-color: #bbf7d0; }
+    .target-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .target-name-container { flex: 1; }
+    .target-name-input {
+      width: 100%; border: none; background: transparent; font-weight: 600; font-size: 1rem;
+      padding: 0.25rem; border-radius: 4px; transition: background-color 0.2s;
+    }
+    .target-name-input:focus { outline: none; background-color: #f3f4f6; }
+
+    .target-details { margin: 0.75rem 0; }
+
+    .progress-bar { width: 100%; height: 8px; background-color: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 0.5rem 0; }
+    .progress-fill { height: 100%; transition: width 0.3s ease; }
+    .progress-fill.success { background-color: #10b981; }
+    .progress-fill.primary { background-color: #3b82f6; }
+
+    .add-target-btn { background: none; border: none; color: #6b7280; font-size: 1rem; cursor: pointer; padding: 1rem; }
+    .add-target-btn:hover { color: #374151; }
+
+    .delete-btn {
+      background-color: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem;
+      border-radius: 4px; font-size: 0.75rem; cursor: pointer; margin-top: 0.5rem;
+    }
+    .delete-btn:hover { background-color: #dc2626; }
+
+    .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .status-funded { background-color: #dcfce7; color: #166534; }
+    .status-partial { background-color: #fef3c7; color: #92400e; }
+
+    .insights-section {
+      background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+      border: 1px solid #93c5fd; border-radius: 12px; padding: 2rem; margin-top: 2rem;
+    }
+    .insights-header { color: #1e40af; font-size: 1.3rem; font-weight: 600; margin-bottom: 1.5rem; }
+    .insights-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
+    .insight-section h4 { color: #1d4ed8; font-weight: 600; margin-bottom: 0.75rem; }
+    .insight-list { color: #1e40af; font-size: 0.95rem; line-height: 1.6; }
+    .insight-list p { margin-bottom: 0.5rem; }
+
+    /* Chart container (for the cumulative chart) */
+    .chart-container {
+      position: relative;
+      height: 400px;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Financial Planning Dashboard</h1>
+      <p>Comprehensive expense tracking and goal management system</p>
+    </div>
+
+    <!-- Inputs -->
+    <div class="grid grid-3">
+      <!-- Salary -->
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-blue"></div><h3>Salary Information</h3>
+        </div>
+        <div class="form-group">
+          <label for="currentNet">Current Net Monthly (£)</label>
+          <input type="number" id="currentNet" class="form-input" value="3661.83" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="newNet">New Net Monthly (£)</label>
+          <input type="number" id="newNet" class="form-input" value="3845.45" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="increaseDate">Increase Effective Date</label>
+          <input type="date" id="increaseDate" class="form-input" value="2025-10-01">
+        </div>
+        <button class="update-btn" onclick="updateCalculations()">Update Calculations</button>
+      </div>
+
+      <!-- Expenses -->
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-green"></div><h3>Monthly Expenses</h3>
+        </div>
+        <div class="form-group">
+          <label for="mortgage">Mortgage (£)</label>
+          <input type="number" id="mortgage" class="form-input" value="1685" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="bills">Bills (£)</label>
+          <input type="number" id="bills" class="form-input" value="300" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="averageSpending">Average Spending (£)</label>
+          <input type="number" id="averageSpending" class="form-input" value="1150" step="0.01">
+        </div>
+        <button class="update-btn" onclick="updateCalculations()">Update Calculations</button>
+      </div>
+
+      <!-- Metrics -->
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-purple"></div><h3>Key Metrics</h3>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric">
+            <div class="metric-label">High Priority Achievement</div>
+            <div id="highPriorityAchievement" class="metric-value success">0%</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Total Savings Allocated</div>
+            <div id="totalSavings" class="metric-value primary">£0</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Emergency Fund</div>
+            <div class="metric-value primary">£2,000</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cumulative chart (only this chart is back) -->
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-green"></div>
+          <h3>Cumulative Goal Progress</h3>
+        </div>
+        <div class="chart-container">
+          <canvas id="cumulativeChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Targets -->
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-green"></div>
+          <h3>High Priority Targets</h3>
+          <span id="highPriorityBadge" class="status-badge status-partial">Calculating…</span>
+        </div>
+        <div id="highPriorityTargets" class="target-grid"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="icon icon-orange"></div>
+          <h3>Lower Priority Targets</h3>
+          <span id="lowPriorityBadge" class="status-badge status-partial">Calculating…</span>
+        </div>
+        <div id="lowPriorityTargets" class="target-grid"></div>
+      </div>
+    </div>
+
+    <!-- Insights -->
+    <div class="insights-section">
+      <div class="insights-header">Strategic Insights & Recommendations</div>
+      <div class="insights-grid">
+        <div class="insight-section">
+          <h4>Positive Outcomes</h4>
+          <div class="insight-list" id="positiveInsights"></div>
+        </div>
+        <div class="insight-section">
+          <h4>Areas for Attention</h4>
+          <div class="insight-list" id="attentionInsights"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Data ----------
+    let salaryData = { currentNet: 3661.83, newNet: 3845.45, increaseDate: '2025-10-01' };
+    let fixedExpenses = { mortgage: 1685, bills: 300, averageSpending: 1150 };
+
+    let highPriorityTargets = [
+      { id: 2, name: 'Christmas Flights', amount: 1000, deadline: '2025-10-31', allocated: 0 },
+      { id: 3, name: 'Leasehold', amount: 400, deadline: '2025-12-31', allocated: 0 },
+      { id: 4, name: 'Self Assessment Tax', amount: 924, deadline: '2026-01-31', allocated: 0 },
+      { id: 5, name: 'Mortgage Fee', amount: 1500, deadline: '2026-05-31', allocated: 0 }
+    ];
+
+    let lowerPriorityTargets = [
+      { id: 6, name: 'Citizenship', amount: 1800, deadline: '2026-04-30', allocated: 0 },
+      { id: 7, name: 'Combi Oven', amount: 350, deadline: '2026-06-30', allocated: 0 },
+      { id: 8, name: 'Conservatory', amount: 6000, deadline: '2026-04-30', allocated: 0 }
+    ];
+
+    // Chart instance
+    let cumulativeChart = null;
+
+    // ---------- Calculations ----------
+    function calculateMonthlySurplus(month, year) {
+      const currentMonth = new Date(year, month - 1);
+      const septemberStart = new Date(2025, 8);  // Sep 2025
+      const octoberStart   = new Date(2025, 9);  // Oct 2025
+
+      if (currentMonth.getTime() === septemberStart.getTime()) return 610;
+      if (currentMonth >= octoberStart) return 710;
+
+      const increaseDate = new Date(salaryData.increaseDate);
+      const netSalary = currentMonth >= increaseDate ? salaryData.newNet : salaryData.currentNet;
+      const totalExpenses = fixedExpenses.mortgage + fixedExpenses.bills + fixedExpenses.averageSpending;
+      return netSalary - totalExpenses;
+    }
+
+    function generateMonthlyProjection() {
+      const projection = [];
+      const cumulativeProjection = [];
+      const startDate = new Date(2025, 8); // Sep 2025
+      const endDate   = new Date(2026, 5); // Jun 2026
+
+      // Working copies
+      let remainingHighPriority = highPriorityTargets.map(t => ({...t, allocated: 0}));
+      let remainingLowPriority  = lowerPriorityTargets.map(t => ({...t, allocated: 0}));
+
+      // For cumulative series
+      let cumulativeTotals = {};
+      [...highPriorityTargets, ...lowerPriorityTargets].forEach(t => cumulativeTotals[t.name] = 0);
+
+      for (let date = new Date(startDate); date <= endDate; date.setMonth(date.getMonth() + 1)) {
+        const month = date.getMonth() + 1;
+        const year  = date.getFullYear();
+        const monthName = date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+
+        const surplus = calculateMonthlySurplus(month, year);
+        let monthlyAllocations = {};
+        [...highPriorityTargets, ...lowerPriorityTargets].forEach(t => monthlyAllocations[t.name] = 0);
+
+        let availableMoney = surplus;
+        const needs = t => t ? Math.max(0, t.amount - t.allocated) : 0;
+
+        const allocHP = (label) => {
+          const target = remainingHighPriority.find(t => t.name === label);
+          if (!target || availableMoney <= 0) return;
+          const needed = needs(target);
+          if (needed > 0) {
+            const allocation = Math.min(needed, availableMoney);
+            monthlyAllocations[label] = allocation;
+            availableMoney -= allocation;
+            target.allocated += allocation;
+          }
+        };
+
+        // High priority first
+        ['Christmas Flights','Leasehold','Self Assessment Tax','Mortgage Fee'].forEach(allocHP);
+
+        // Lower priority after highs complete (or deadline passed)
+        const allHPComplete = remainingHighPriority.every(t =>
+          t.allocated >= t.amount || new Date(t.deadline) < date
+        );
+        if (allHPComplete && availableMoney > 0) {
+          const allocLP = (label) => {
+            const target = remainingLowPriority.find(t => t.name === label);
+            if (!target || availableMoney <= 0) return;
+            const needed = needs(target);
+            if (needed > 0) {
+              const allocation = Math.min(needed, availableMoney);
+              monthlyAllocations[label] = allocation;
+              availableMoney -= allocation;
+              target.allocated += allocation;
+            }
+          };
+          ['Citizenship','Combi Oven','Conservatory'].forEach(allocLP);
+        }
+
+        // Update cumulative totals (cap at target amount)
+        Object.keys(cumulativeTotals).forEach(name => {
+          const target = [...highPriorityTargets, ...lowerPriorityTargets].find(t => t.name === name);
+          if (target) {
+            const newTotal = cumulativeTotals[name] + (monthlyAllocations[name] || 0);
+            cumulativeTotals[name] = Math.min(newTotal, target.amount);
+          }
+        });
+
+        projection.push({ month: monthName, ...monthlyAllocations });
+        cumulativeProjection.push({ month: monthName, ...Object.assign({}, cumulativeTotals) });
+      }
+
+      return {
+        projection,
+        cumulativeProjection,
+        finalHighPriority: remainingHighPriority,
+        finalLowPriority: remainingLowPriority
+      };
+    }
+
+    // ---------- UI helpers ----------
+    function updateTargetProperty(priorityLevel, index, property, value) {
+      const targetArray = priorityLevel === 'high' ? highPriorityTargets : lowerPriorityTargets;
+      if (index >= 0 && index < targetArray.length) {
+        targetArray[index][property] = value;
+        updateCalculations();
+      }
+    }
+
+    function addNewTarget(priorityLevel) {
+      const targetName = prompt(`Enter name for new ${priorityLevel} priority target:`);
+      if (!targetName) return;
+
+      const targetAmount = parseFloat(prompt('Enter target amount (£):'));
+      if (isNaN(targetAmount) || targetAmount <= 0) { alert('Please enter a valid positive amount'); return; }
+
+      const targetDeadline = prompt('Enter deadline (YYYY-MM-DD format):');
+      if (!targetDeadline) return;
+
+      const newTarget = { id: Date.now(), name: targetName, amount: targetAmount, deadline: targetDeadline, allocated: 0 };
+      (priorityLevel === 'high' ? highPriorityTargets : lowerPriorityTargets).push(newTarget);
+      updateCalculations();
+    }
+
+    function deleteTarget(priorityLevel, index) {
+      const targetArray = priorityLevel === 'high' ? highPriorityTargets : lowerPriorityTargets;
+      if (index >= 0 && index < targetArray.length) {
+        const name = targetArray[index].name;
+        if (confirm(`Remove "${name}" from your financial targets?`)) {
+          targetArray.splice(index, 1);
+          updateCalculations();
+        }
+      }
+    }
+
+    function isValidDate(dateString) {
+      const date = new Date(dateString);
+      const today = new Date();
+      const fiveYears = new Date(); fiveYears.setFullYear(today.getFullYear() + 5);
+      return date instanceof Date && !isNaN(date) && date >= today && date <= fiveYears;
+    }
+
+    function updateInputValues() {
+      const byId = id => document.getElementById(id);
+      salaryData.currentNet = parseFloat(byId('currentNet').value) || 0;
+      salaryData.newNet     = parseFloat(byId('newNet').value) || 0;
+      salaryData.increaseDate = byId('increaseDate').value;
+
+      fixedExpenses.mortgage = parseFloat(byId('mortgage').value) || 0;
+      fixedExpenses.bills    = parseFloat(byId('bills').value) || 0;
+      fixedExpenses.averageSpending = parseFloat(byId('averageSpending').value) || 0;
+    }
+
+    function updateTargetDisplays(finalHighPriority, finalLowPriority) {
+      const highPriorityContainer = document.getElementById('highPriorityTargets');
+      const lowPriorityContainer  = document.getElementById('lowPriorityTargets');
+      if (!highPriorityContainer || !lowPriorityContainer) return;
+
+      highPriorityContainer.innerHTML = '';
+      lowPriorityContainer.innerHTML = '';
+
+      // High priority
+      highPriorityTargets.forEach((target, index) => {
+        const finalTarget = finalHighPriority[index];
+        const progress = target.amount > 0 ? (finalTarget.allocated / target.amount) : 0;
+        const pct = Math.min(100, progress * 100);
+        const funded = pct >= 99;
+
+        const card = document.createElement('div');
+        card.className = `target-card ${funded ? 'funded' : ''}`;
+        card.innerHTML = `
+          <div class="target-header">
+            <div class="target-name-container">
+              <input type="text" class="target-name-input" value="${target.name}"
+                     onchange="updateTargetProperty('high', ${index}, 'name', this.value)">
+            </div>
+          </div>
+          <div class="target-details">
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <label style="font-size: 0.875rem; font-weight: 500;">Target Amount (£)</label>
+              <input type="number" class="form-input" value="${target.amount}" step="0.01"
+                     onchange="updateTargetProperty('high', ${index}, 'amount', parseFloat(this.value))">
+            </div>
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <label style="font-size: 0.875rem; font-weight: 500;">Deadline</label>
+              <input type="date" class="form-input" value="${target.deadline}"
+                     onchange="updateTargetProperty('high', ${index}, 'deadline', this.value)">
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill ${funded ? 'success' : 'primary'}" style="width: ${pct}%"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:0.875rem; margin-top:0.5rem;">
+            <span>Projected: £${Math.round(finalTarget.allocated).toLocaleString()}</span>
+            <span class="${funded ? 'success' : ''}" style="font-weight:600;">${Math.round(pct)}%</span>
+          </div>
+          <button class="delete-btn" onclick="deleteTarget('high', ${index})">Remove Target</button>
+        `;
+        highPriorityContainer.appendChild(card);
+      });
+
+      // Low priority
+      lowerPriorityTargets.forEach((target, index) => {
+        const finalTarget = finalLowPriority[index];
+        const progress = target.amount > 0 ? (finalTarget.allocated / target.amount) : 0;
+        const pct = Math.min(100, progress * 100);
+
+        const card = document.createElement('div');
+        card.className = 'target-card';
+        card.innerHTML = `
+          <div class="target-header">
+            <div class="target-name-container">
+              <input type="text" class="target-name-input" value="${target.name}"
+                     onchange="updateTargetProperty('low', ${index}, 'name', this.value)">
+            </div>
+          </div>
+          <div class="target-details">
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <label style="font-size: 0.875rem; font-weight: 500;">Target Amount (£)</label>
+              <input type="number" class="form-input" value="${target.amount}" step="0.01"
+                     onchange="updateTargetProperty('low', ${index}, 'amount', parseFloat(this.value))">
+            </div>
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <label style="font-size: 0.875rem; font-weight: 500;">Deadline</label>
+              <input type="date" class="form-input" value="${target.deadline}"
+                     onchange="updateTargetProperty('low', ${index}, 'deadline', this.value)">
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill primary" style="width: ${pct}%"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:0.875rem; margin-top:0.5rem;">
+            <span>Projected: £${Math.round(finalTarget.allocated).toLocaleString()}</span>
+            <span style="font-weight:600;">${Math.round(pct)}%</span>
+          </div>
+          <button class="delete-btn" onclick="deleteTarget('low', ${index})">Remove Target</button>
+        `;
+        lowPriorityContainer.appendChild(card);
+      });
+
+      // Add buttons
+      const addHigh = document.createElement('div');
+      addHigh.className = 'target-card';
+      addHigh.style.cssText = 'display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px dashed #d1d5db;background:#f9fafb;';
+      addHigh.innerHTML = `<button onclick="addNewTarget('high')" class="add-target-btn">+ Add High Priority Target</button>`;
+      highPriorityContainer.appendChild(addHigh);
+
+      const addLow = document.createElement('div');
+      addLow.className = 'target-card';
+      addLow.style.cssText = 'display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px dashed #d1d5db;background:#f9fafb;';
+      addLow.innerHTML = `<button onclick="addNewTarget('low')" class="add-target-btn">+ Add Lower Priority Target</button>`;
+      lowPriorityContainer.appendChild(addLow);
+    }
+
+    function updateInsights(finalHighPriority, finalLowPriority) {
+      const pos = document.getElementById('positiveInsights');
+      const att = document.getElementById('attentionInsights');
+      const hpEl = document.getElementById('highPriorityAchievement');
+      const tsEl = document.getElementById('totalSavings');
+      const hpBadge = document.getElementById('highPriorityBadge');
+      const lpBadge = document.getElementById('lowPriorityBadge');
+
+      const hpTotal = highPriorityTargets.reduce((s,t)=>s+t.amount,0);
+      const hpAllocated = finalHighPriority.reduce((s,t)=>s+t.allocated,0);
+      const hpPct = hpTotal > 0 ? (hpAllocated / hpTotal) * 100 : 0;
+
+      const lpTotal = lowerPriorityTargets.reduce((s,t)=>s+t.amount,0);
+      const lpAllocated = finalLowPriority.reduce((s,t)=>s+t.allocated,0);
+      const lpPct = lpTotal > 0 ? (lpAllocated / lpTotal) * 100 : 0;
+
+      const totalSavings = hpAllocated + lpAllocated;
+
+      if (hpEl) hpEl.textContent = `${Math.round(hpPct)}%`;
+      if (tsEl) tsEl.textContent = `£${Math.round(totalSavings).toLocaleString()}`;
+
+      if (hpBadge) {
+        hpBadge.textContent = hpPct >= 100 ? '100% Achievable' : 'Partially Achievable';
+        hpBadge.className = `status-badge ${hpPct >= 100 ? 'status-funded' : 'status-partial'}`;
+      }
+      if (lpBadge) {
+        lpBadge.textContent = lpPct >= 100 ? '100% Achievable' : 'Partially Achievable';
+        lpBadge.className = `status-badge ${lpPct >= 100 ? 'status-funded' : 'status-partial'}`;
+      }
+
+      if (pos) {
+        pos.innerHTML = `
+          <p>• High-priority targets are ${Math.round(hpPct)}% achievable</p>
+          <p>• Emergency fund remains protected at £2,000</p>
+          <p>• Salary increase provides additional breathing room from October</p>
+          <p>• Total savings allocation of £${Math.round(totalSavings).toLocaleString()} over the planning period</p>
+        `;
+      }
+
+      if (att) {
+        const attentionPoints = [];
+        finalLowPriority.forEach((t, i) => {
+          if (i < lowerPriorityTargets.length) {
+            const original = lowerPriorityTargets[i];
+            const ach = original.amount > 0 ? (t.allocated / original.amount) * 100 : 0;
+            if (ach < 80) attentionPoints.push(`• ${original.name} is only ${Math.round(ach)}% funded`);
+          }
+        });
+        attentionPoints.push('• Monitor actual expenses to ensure they stay within budget');
+        attentionPoints.push('• Consider alternative funding strategies for lower-priority items');
+        att.innerHTML = attentionPoints.map(p=>`<p>${p}</p>`).join('');
+      }
+    }
+
+    // ---------- Chart (cumulative only) ----------
+    function renderCumulativeChart(cumulativeProjection) {
+      const canvas = document.getElementById('cumulativeChart');
+      if (!canvas) return;
+
+      const monthLabels = cumulativeProjection.map(p => p.month);
+
+      // color palette per target
+      const targetColors = {
+        'Christmas Flights': '#ea580c',
+        'Leasehold': '#d97706',
+        'Self Assessment Tax': '#ca8a04',
+        'Mortgage Fee': '#65a30d',
+        'Citizenship': '#2563eb',
+        'Combi Oven': '#7c3aed',
+        'Conservatory': '#be185d'
+      };
+
+      const allTargets = [...highPriorityTargets, ...lowerPriorityTargets];
+
+      const datasets = allTargets.map(target => ({
+        label: target.name,
+        data: cumulativeProjection.map(p => p[target.name] || 0),
+        borderColor: targetColors[target.name] || '#6b7280',
+        backgroundColor: (targetColors[target.name] || '#6b7280') + '20',
+        borderWidth: 3,
+        fill: false,
+        tension: 0.1
+      }));
+
+      if (cumulativeChart) cumulativeChart.destroy();
+      const ctx = canvas.getContext('2d');
+
+      cumulativeChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: monthLabels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { callback: v => '£' + v.toLocaleString() }
+            }
+          },
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: function(context) {
+                  const target = allTargets.find(t => t.name === context.dataset.label);
+                  const progress = target ? Math.round((context.parsed.y / target.amount) * 100) : 0;
+                  return `${context.dataset.label}: £${context.parsed.y.toLocaleString()} (${progress}% of £${target ? target.amount.toLocaleString() : '0'})`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ---------- Orchestration ----------
+    function updateCalculations() {
+      updateInputValues();
+      const { cumulativeProjection, finalHighPriority, finalLowPriority } = generateMonthlyProjection();
+      updateTargetDisplays(finalHighPriority, finalLowPriority);
+      updateInsights(finalHighPriority, finalLowPriority);
+      renderCumulativeChart(cumulativeProjection);
+    }
+
+    document.addEventListener('DOMContentLoaded', updateCalculations);
+  </script>
+</body>
+</html>
